@@ -1,23 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { Grid } from '@mui/material';
-import { Car, Clock, Wrench, CheckCircle2, LogOut, Maximize, ClipboardList, User } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Car, Clock, Wrench, CheckCircle2, LogOut, Maximize, ClipboardList, User, PackageCheck } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import styles from './Kiosk.module.css';
 import { ROUTES } from '../../config/routes';
 import useAuthStore from '../../store/useAuthStore';
 import { getFirstReadablePath } from '../../utils/authAccess';
-
 import { useTvKioskDashboard } from '../../queries/useDashboardQueries';
 import { useSocket } from '../../hooks/useSocket';
+import { formatWaitTime } from '../../utils/formatters';
 
-const formatWaitTime = (minutes) => {
-  if (!minutes && minutes !== 0) return 'Just now';
-  if (minutes < 60) return `${minutes} mins`;
-  const hrs = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins > 0 ? `${hrs} hr ${mins} min` : `${hrs} hrs`;
-};
+
 
 const formatReadyTime = (dateString) => {
   if (!dateString) return 'Just now';
@@ -111,8 +105,15 @@ export default function KioskDisplay() {
   const [time, setTime] = useState(new Date());
   const [readyParent] = useAutoAnimate({ duration: 800, easing: 'ease-in-out' });
 
-  const { data: rawJobs, refetch } = useTvKioskDashboard();
-  const jobs = Array.isArray(rawJobs?.data || rawJobs) ? (rawJobs?.data || rawJobs || []) : [];
+  const [searchParams] = useSearchParams();
+  const kioskKey = searchParams.get('kioskKey') || undefined;
+  const { data: rawJobs, refetch, isError, error } = useTvKioskDashboard({ kioskKey });
+  // API now returns { queue, deliveredToday } — fall back to legacy plain-array shape
+  const rawData = rawJobs?.data || rawJobs;
+  const jobs = Array.isArray(rawData?.queue)
+    ? rawData.queue
+    : Array.isArray(rawData) ? rawData : [];
+  const deliveredTodayRaw = Array.isArray(rawData?.deliveredToday) ? rawData.deliveredToday : [];
 
   useSocket({
     jobCardStatusChanged: (data) => {
@@ -141,6 +142,9 @@ export default function KioskDisplay() {
   const ready = jobs.filter(j => j.column === 'READY_FOR_DELIVERY').map(j => ({
     id: j.id, vehicle: j.vehicleNumber, model: j.vehicleInfo, time: formatReadyTime(j.updatedAt), customerName: j.customerName
   }));
+  const delivered = deliveredTodayRaw.map(d => ({
+    id: d.id, vehicle: d.vehicleNumber, model: d.vehicleInfo, time: formatReadyTime(d.exitTime), customerName: d.customerName
+  }));
 
   const animatedReady = useAutoScroll(ready, 4, 3500);
 
@@ -160,6 +164,22 @@ export default function KioskDisplay() {
     }
     navigate(isAuthenticated ? getFirstReadablePath(menus, ROUTES.PROFILE) : ROUTES.LOGIN);
   };
+
+  if (isError && (error?.response?.status === 401 || error?.response?.status === 403 || !kioskKey)) {
+    return (
+      <div className={styles.container} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#0f172a' }}>
+        <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#1e293b', borderRadius: '24px', maxWidth: '600px', color: '#fff', border: '1px solid #334155' }}>
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#ef4444', fontWeight: 800 }}>⚠️ TV Display Unauthorized</h1>
+          <p style={{ fontSize: '1.25rem', marginBottom: '1.5rem', color: '#e2e8f0' }}>
+            {error?.response?.data?.message || 'TV Kiosk API Key is missing, expired, or revoked.'}
+          </p>
+          <p style={{ fontSize: '1rem', opacity: 0.7 }}>
+            Please contact the IT Admin team for the updated Location URL bookmark (e.g. <code>?kioskKey=...</code>).
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -188,19 +208,11 @@ export default function KioskDisplay() {
         </div>
       </header>
 
-      {/* Main Grid */}
+      {/* Main Grid — shows only Ready for Delivery and Delivered Today */}
       <div className={styles.grid}>
         <Grid container spacing={{ xs: 1.5, md: 2, lg: 3 }} sx={{ height: { xs: 'auto', lg: '100%' } }}>
-          <Grid item xs={12} sm={6} lg={3} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
-            <DisplaySection title="Mechanical" icon={Wrench} items={mechanical} statusClass={styles.mechSection} />
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
-            <DisplaySection title="Body Shop" icon={Wrench} items={bodyShop} statusClass={styles.bodySection} />
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
-            <DisplaySection title="Water Wash" icon={Wrench} items={waterWash} statusClass={styles.washSection} />
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
+          {/* Ready to Delivery */}
+          <Grid item xs={12} sm={6} lg={6} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
             <div className={`${styles.section} ${styles.readySection}`}>
               <div className={styles.sectionHeader}>
                 <div className={styles.sectionTitle}><CheckCircle2 size={24} /> Ready to Delivery</div>
@@ -243,7 +255,17 @@ export default function KioskDisplay() {
               </div>
             </div>
           </Grid>
+          {/* Delivered Today — sourced from mobileGateEntry exitTime today */}
+          <Grid item xs={12} sm={6} lg={6} sx={{ height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '450px', lg: 'auto' } }}>
+            <DisplaySection
+              title={`Delivered Today `}
+              icon={PackageCheck}
+              items={delivered}
+              statusClass={styles.deliveredSection}
+            />
+          </Grid>
         </Grid>
+
       </div>
     </div>
   );
