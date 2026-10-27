@@ -10,13 +10,21 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
-const app = initializeApp(firebaseConfig);
+const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
+
+const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 let messaging = null;
-try {
-  messaging = getMessaging(app);
-} catch (err) {
-  console.warn('Firebase Messaging not supported or failed to initialize:', err);
+if (app) {
+  try {
+    messaging = getMessaging(app);
+  } catch (err) {
+    console.warn('Firebase Messaging not supported or failed to initialize:', err);
+  }
 }
 
 export { app, messaging };
