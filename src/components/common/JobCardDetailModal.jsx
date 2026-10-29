@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, Grid, Card, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
-import { X, Car, User, FileText, PlusCircle, Shield, ExternalLink, ArrowRight, Clock, Mic } from 'lucide-react';
+import { X, Car, User, FileText, PlusCircle, Shield, ExternalLink, ArrowRight, Clock, Mic, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useJobCard } from '../../queries/useDataQueries';
 import StatusBadge from './StatusBadge';
 import Loader from './Loader';
 import Button from './Button';
 import VehicleNumberPlate from './VehicleNumberPlate';
+import CustomerWhatsAppChatModal from '../chat/CustomerWhatsAppChatModal';
 import { formatDateTime, formatCurrency } from '../../utils/formatters';
 import { ROUTES } from '../../config/routes';
 
@@ -18,6 +19,7 @@ export default function JobCardDetailModal({
   onAssign
 }) {
   const navigate = useNavigate();
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const { data: jobCard, isLoading } = useJobCard(jobCardId);
 
   if (!isOpen) return null;
@@ -67,6 +69,7 @@ export default function JobCardDetailModal({
   const totalGrandTotal = taxableAmount + totalTaxAmount;
 
   return (
+    <>
     <Dialog
       open={isOpen}
       onClose={onClose}
@@ -168,9 +171,35 @@ export default function JobCardDetailModal({
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
                       Mobile Number
                     </Typography>
-                    <Typography variant="body2" fontWeight={700} sx={{ color: '#1E293B' }}>
-                      {customerMobile}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: '#1E293B' }}>
+                        {customerMobile}
+                      </Typography>
+                      {customerMobile && customerMobile !== '—' && (
+                        <Box
+                          component="button"
+                          onClick={() => setIsChatOpen(true)}
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                            bgcolor: '#25D366',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: 1.5,
+                            px: 1.25,
+                            py: 0.5,
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            '&:hover': { bgcolor: '#128C7E' }
+                          }}
+                        >
+                          <MessageSquare size={13} />
+                          WhatsApp
+                        </Box>
+                      )}
+                    </Box>
                   </Grid>
                   <Grid item xs={12} sm={6} sx={{ borderTop: '1px solid #F1F5F9', pt: 2 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontWeight: 600 }}>
@@ -478,5 +507,17 @@ export default function JobCardDetailModal({
         </Box> */}
       </DialogActions>
     </Dialog>
+
+    {/* Customer WhatsApp Chat Modal */}
+    <CustomerWhatsAppChatModal
+      isOpen={isChatOpen}
+      onClose={() => setIsChatOpen(false)}
+      jobCardId={jobCard?.id || jobCardId}
+      customerName={customerName}
+      customerMobile={customerMobile}
+      vehicleNo={vehicleNumber}
+      jobCardNo={jobCard?.jobCardNo}
+    />
+    </>
   );
 }

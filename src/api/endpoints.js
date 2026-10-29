@@ -53,6 +53,13 @@ export const ENDPOINTS = {
     PENDING: '/job-cards/list?status=PENDING',
   },
 
+  // Customer WhatsApp Chat
+  CHAT: {
+    GET: (jobCardId) => `/chat/job-card/${jobCardId}`,
+    SEND: (jobCardId) => `/chat/job-card/${jobCardId}/messages`,
+    MARK_READ: (jobCardId) => `/chat/job-card/${jobCardId}/read`,
+  },
+
   // Approvals
   APPROVALS: {
     LIST: '/approvals/list',
@@ -254,5 +261,12 @@ export const ENDPOINTS = {
     ROLES: '/roles',
     USERS: '/users',
     LOCATIONS: '/locations',
+  },
+
+  CHAT: {
+    GET: (id) => `/chat/job-card/${id}`,
+    SEND: (id) => `/chat/job-card/${id}/messages`,
+    MARK_READ: (id) => `/chat/job-card/${id}/read`,
+    RECENT_CHATS: '/chat/recent-chats',
   }
 };

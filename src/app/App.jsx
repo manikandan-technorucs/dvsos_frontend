@@ -51,7 +51,7 @@ function App() {
   return (
     <Providers>
       <AuthInitializer>
-        <RouterProvider router={router} future={{ v7_startTransition: true }} />
+        <RouterProvider router={router} />
       </AuthInitializer>
     </Providers>
   );
